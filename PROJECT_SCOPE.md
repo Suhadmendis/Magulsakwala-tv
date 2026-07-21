@@ -71,6 +71,27 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 | `cron/process-scheduled-uploads.php` | Publishes videos whose scheduled time has passed |
 | `cron/process-auto-replies.php` | Scans new comments and applies matching auto-reply rules |
 
+## Database Schema
+
+### `accounts`
+
+One row per managed YouTube channel (currently ~10 channels), storing the credentials and metadata needed to operate that channel via the YouTube API.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INT, PK, auto-increment | Row identifier |
+| `platform` | VARCHAR | Platform flag, e.g. `"youtube"` (supports future multi-platform rows) |
+| `channel_id` | VARCHAR | External platform channel/account ID (e.g. YouTube channel ID) |
+| `name` | VARCHAR | Channel/account display name |
+| `url` | VARCHAR | Channel/account URL |
+| `api_key` | VARCHAR | Client key/API key for this account |
+| `api_secret` | VARCHAR | Client secret for this account |
+| `access_token` | TEXT | Current OAuth access token |
+| `refresh_token` | TEXT | OAuth refresh token |
+| `token_expires_at` | DATETIME | When `access_token` expires and needs refreshing |
+| `created_at` | DATETIME | Row creation timestamp |
+| `updated_at` | DATETIME | Last updated timestamp |
+
 ## Out of Scope
 
 - Python is not used anywhere in this project (no scripts, tooling, or services).
