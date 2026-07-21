@@ -30,6 +30,8 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 ### Sitemap
 
 - **Top bar**: minimal — contains only the **YouTube account select box**, on the right side. No logo or nav links here.
+  - Clicking it opens a dropdown listing every connected `accounts` row.
+  - Each row in the dropdown has an **edit** button (left side of the row) that goes straight to an **account edit page**, prefilled with that account's current details (backed by `GET /api/accounts/{id}` and saved via `PUT /api/accounts/{id}`).
 - **Left sidebar**: primary navigation —
   - Video Operations
   - Comments
@@ -38,12 +40,18 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
   - **Compose** (button, opens the Compose screen)
 - The account select box lists all rows from `accounts`. Whichever account is selected becomes the active context for the rest of the app.
 - **All data fetches (videos, comments, analytics) are scoped to the currently selected account** — every list/detail request filters by that account's `id`, never showing data belonging to other accounts.
-- **Thumbnail creator**: a dedicated section/page in the app for creating video thumbnails (separate from just uploading a video). Exact capabilities (upload vs. AI-generated vs. template editor) still to be defined.
+- **Thumbnails**: the sidebar item opens the thumbnail **editor tool** directly (background + image slots + text, per the `thumbnails` table).
+
+### Video Operations page
+
+- Lists videos for the selected account. **No upload/create button here** — creating a new video happens on the Compose screen instead.
+- A **Search** button opens a popup dialog: a filterable list of videos. Selecting one from the list loads all of that video's fields into the edit form — including drafts, so every field (even partially-filled ones) is editable.
+- The search dialog only ever lists videos with status `draft`, `prepared`, or `scheduled` — `published` and `failed` videos are excluded (nothing left to edit there).
 
 ### Compose screen
 
-- Opened via the **Compose** button in the left sidebar.
-- Fetches and shows exactly **one** video: for the currently selected account, among `scheduled` videos (already `prepared` and given a `scheduled_at`), pick the one whose `scheduled_at` is closest to the current date/time.
+- Opened via the **Compose** button in the left sidebar. This is also the **dedicated upload/creation entry point** for new videos (there's no separate upload button elsewhere).
+- Also fetches and shows exactly **one** video: for the currently selected account, among `scheduled` videos (already `prepared` and given a `scheduled_at`), pick the one whose `scheduled_at` is closest to the current date/time.
 - Displays a preview of that video — its rendered thumbnail image and its details (title, description, etc.).
 - A **Post** button publishes that previewed video to the selected YouTube channel right now (does not wait for its `scheduled_at`/the cron job). Under the hood this calls the same `POST /api/videos/post-next` endpoint below, passing the currently selected account's `id`.
 
@@ -82,6 +90,7 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 |---|---|---|
 | POST | `/api/videos/upload` | Upload a video and create its `draft` record |
 | GET | `/api/videos` | List videos (draft, prepared, scheduled, published, failed) |
+| GET | `/api/videos/search` | Search videos for the Video Operations search dialog. Supports filters (e.g. `video_type`, keyword on `title`/`topic`); always restricted to `draft`, `prepared`, or `scheduled` status |
 | GET | `/api/videos/{id}` | Get details for a single video |
 | PUT | `/api/videos/{id}` | Update a video's fields (title, description, tags, thumbnail, video_type, etc.); auto-advances `draft` → `prepared` once all required fields are valid |
 | PUT | `/api/videos/{id}/schedule` | Set/update `scheduled_at` on a `prepared` video, moving it to `scheduled` |
