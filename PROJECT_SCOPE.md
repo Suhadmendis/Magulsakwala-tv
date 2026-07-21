@@ -2,11 +2,11 @@
 
 ## Overview
 
-Magulsakwala-tv is a social media automation web application focused on YouTube channel management. It provides a single-admin, no-login web interface for uploading and scheduling videos, auto-replying to comments, generating content metadata, and viewing channel analytics — built with a React frontend and a PHP backend.
+Magulsakwala-tv is a social media automation web application focused on YouTube channel management. It provides a single-admin, no-login web interface for uploading and scheduling videos, managing comments with AI-suggested (manually confirmed) replies, generating content metadata, and viewing channel analytics — built with a React frontend and a PHP backend.
 
 ## Goals
 
-- Automate recurring YouTube channel tasks: video uploads/scheduling, comment replies, and content metadata generation.
+- Automate recurring YouTube channel tasks: video uploads/scheduling, comment management, and content metadata generation.
 - Surface channel analytics (views, watch time, subscriber growth) in one place.
 - Keep the app simple: single admin, no authentication/login layer.
 
@@ -47,16 +47,15 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 | PUT | `/api/videos/{id}/schedule` | Set/update `scheduled_at` on a `prepared` video, moving it to `scheduled` |
 | DELETE | `/api/videos/{id}` | Cancel a scheduled upload or remove a video record |
 
-### Comments (Auto-Reply)
+### Comments
+
+A single dedicated Comments page lists all comments for the selected account. Comments without a reply yet are surfaced first, oldest un-replied comment at the very top. Replies are never sent automatically — the AI only suggests a reply, and a human must press a manual **Confirm** button to actually post it.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/comments` | List recent comments across videos |
-| POST | `/api/comments/{id}/reply` | Manually reply to a specific comment |
-| GET | `/api/comments/auto-reply-rules` | List configured auto-reply rules |
-| POST | `/api/comments/auto-reply-rules` | Create a new auto-reply rule |
-| PUT | `/api/comments/auto-reply-rules/{id}` | Update an auto-reply rule |
-| DELETE | `/api/comments/auto-reply-rules/{id}` | Delete an auto-reply rule |
+| GET | `/api/comments` | List all comments, sorted with the oldest un-replied comment first |
+| POST | `/api/comments/{id}/suggest-reply` | Generate an AI-suggested reply for a comment (does not send it) |
+| POST | `/api/comments/{id}/reply` | Manually confirm and send a reply (the suggested text, or an edited version) |
 
 ### Content Generation
 
@@ -87,7 +86,7 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 | Script | Description |
 |---|---|
 | `cron/process-scheduled-uploads.php` | Publishes videos whose scheduled time has passed |
-| `cron/process-auto-replies.php` | Scans new comments and applies matching auto-reply rules |
+| `cron/sync-comments.php` | Pulls new comments from YouTube into the `comments` table (no auto-replying) |
 
 ## Database Schema
 
@@ -160,6 +159,24 @@ One row per video (1:1 with `video_operations`, linked back via `video_operation
 | `text_2` | VARCHAR | Text element 2 |
 | `text_3` | VARCHAR | Text element 3 |
 | `rendered_image` | VARCHAR | Path/URL to the final composited thumbnail image (background + images + text merged) |
+| `created_at` | DATETIME | Row creation timestamp |
+| `updated_at` | DATETIME | Last updated timestamp |
+
+### `comments`
+
+One row per YouTube comment, synced in from the platform. Drives the dedicated Comments page, where un-replied comments (oldest first) are shown at the top.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INT, PK, auto-increment | Row identifier |
+| `video_id` | INT, FK -> `video_operations.id` | The video this comment was posted on |
+| `youtube_comment_id` | VARCHAR | The comment's ID on YouTube |
+| `author_name` | VARCHAR | Commenter's display name |
+| `comment_text` | TEXT | The comment's content |
+| `commented_at` | DATETIME | When the comment was posted on YouTube |
+| `ai_suggested_reply` | TEXT | AI-generated suggested reply (nullable, populated on request) |
+| `reply_text` | TEXT | The reply that was actually sent (nullable until replied) |
+| `replied_at` | DATETIME | When the reply was sent; `NULL` means still un-replied (used to sort un-replied comments to the top) |
 | `created_at` | DATETIME | Row creation timestamp |
 | `updated_at` | DATETIME | Last updated timestamp |
 
