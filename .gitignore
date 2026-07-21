@@ -1,0 +1,12 @@
+# Environment / secrets
+backend/.env
+
+# Local SQLite dev database
+backend/database/dev.sqlite
+
+# Uploaded/generated media (per-account storage folders)
+storage/accounts/*
+!storage/accounts/.gitkeep
+
+# OS/editor cruft
+.DS_Store
