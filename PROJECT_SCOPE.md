@@ -15,7 +15,7 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 - Frontend: React
 - Backend: PHP
 - Frontend/backend communication: REST API (JSON)
-- Scheduled/background work: PHP cron jobs (video publishing, auto-reply processing)
+- Scheduled/background work: PHP cron jobs (video publishing only — comments and analytics are always fetched live)
 
 ## Platform Scope
 
@@ -74,13 +74,13 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 
 ### Comments
 
-A single dedicated Comments page lists all comments for the selected account. Comments without a reply yet are surfaced first, oldest un-replied comment at the very top. Replies are never sent automatically — the AI only suggests a reply, and a human must press a manual **Confirm** button to actually post it.
+Comments are **fetched live from the YouTube API on every request** — there is no local `comments` table. The endpoint pulls comment threads from YouTube for the selected account, determines which ones don't have a reply from us yet, and returns those un-replied comments (oldest first). Replies are never sent automatically — the AI only suggests a reply, and a human must press a manual **Confirm** button to actually post it.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/comments` | List all comments, sorted with the oldest un-replied comment first |
-| POST | `/api/comments/{id}/suggest-reply` | Generate an AI-suggested reply for a comment (does not send it) |
-| POST | `/api/comments/{id}/reply` | Manually confirm and send a reply (the suggested text, or an edited version) |
+| GET | `/api/comments` | Live-fetch un-replied comments from YouTube, oldest first |
+| POST | `/api/comments/{youtube_comment_id}/suggest-reply` | Generate an AI-suggested reply for a comment (does not send it) |
+| POST | `/api/comments/{youtube_comment_id}/reply` | Manually confirm and send a reply directly to YouTube (the suggested text, or an edited version) |
 
 ### Content Generation
 
@@ -113,7 +113,8 @@ Analytics are **fetched live from the YouTube API on every request** — there i
 | Script | Description |
 |---|---|
 | `cron/process-scheduled-uploads.php` | Publishes videos whose scheduled time has passed |
-| `cron/sync-comments.php` | Pulls new comments from YouTube into the `comments` table (no auto-replying) |
+
+Comments and analytics need no cron job — both are fetched live from YouTube on demand.
 
 ## Database Schema
 
@@ -189,30 +190,13 @@ One row per video (1:1 with `video_operations`, linked back via `video_operation
 | `created_at` | DATETIME | Row creation timestamp |
 | `updated_at` | DATETIME | Last updated timestamp |
 
-### `comments`
-
-One row per YouTube comment, synced in from the platform. Drives the dedicated Comments page, where un-replied comments (oldest first) are shown at the top.
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | INT, PK, auto-increment | Row identifier |
-| `video_id` | INT, FK -> `video_operations.id` | The video this comment was posted on |
-| `youtube_comment_id` | VARCHAR | The comment's ID on YouTube |
-| `author_name` | VARCHAR | Commenter's display name |
-| `comment_text` | TEXT | The comment's content |
-| `commented_at` | DATETIME | When the comment was posted on YouTube |
-| `ai_suggested_reply` | TEXT | AI-generated suggested reply (nullable, populated on request) |
-| `reply_text` | TEXT | The reply that was actually sent (nullable until replied) |
-| `replied_at` | DATETIME | When the reply was sent; `NULL` means still un-replied (used to sort un-replied comments to the top) |
-| `created_at` | DATETIME | Row creation timestamp |
-| `updated_at` | DATETIME | Last updated timestamp |
-
 ## Out of Scope
 
 - Python is not used anywhere in this project (no scripts, tooling, or services).
 - Node.js is not used anywhere in this project (no npm-based build tooling or Node services).
 - No login/authentication system.
 - No platforms beyond YouTube for now (Instagram, Facebook, Twitter/X, TikTok, etc. are not included).
+- No local `comments` or `analytics` tables — both are always fetched live from the YouTube API, never cached.
 
 ## Status
 
