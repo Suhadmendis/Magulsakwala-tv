@@ -32,9 +32,34 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 - **All data fetches (videos, comments, analytics) are scoped to the currently selected account** — every list/detail request filters by that account's `id`, never showing data belonging to other accounts.
 - **Thumbnail creator**: a dedicated section/page in the app for creating video thumbnails (separate from just uploading a video). Exact capabilities (upload vs. AI-generated vs. template editor) still to be defined.
 
+## File Storage
+
+- All media (videos, thumbnail components, rendered thumbnails) is stored **locally on disk within the project** — no cloud storage.
+- There's a parent storage folder containing one dedicated subfolder per YouTube account.
+- **Creating a YouTube account also creates its folder** — provisioning the account's storage directory is part of the `POST /api/accounts` flow.
+- Folder structure:
+  ```
+  storage/
+    accounts/
+      {account_id}/
+        videos/
+        thumbnails/
+  ```
+- `video_operations.video_path` and the `thumbnails` table's image columns store paths within that account's folder, so all of a channel's media stays isolated from every other channel's.
+
 ## Endpoints
 
 All list/detail endpoints below are scoped to the currently selected YouTube account (e.g. via an `account_id` query param or path segment), per the top bar's account selector.
+
+### Accounts
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/accounts` | List all connected YouTube accounts (powers the top bar's account selector) |
+| POST | `/api/accounts` | Create a new YouTube account connection; also provisions its dedicated storage folder on disk |
+| GET | `/api/accounts/{id}` | Get details for a single account |
+| PUT | `/api/accounts/{id}` | Update an account's credentials/details |
+| DELETE | `/api/accounts/{id}` | Remove an account |
 
 ### Videos
 
