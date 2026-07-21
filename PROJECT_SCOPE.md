@@ -16,6 +16,7 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 - Backend: PHP
 - Frontend/backend communication: REST API (JSON)
 - Scheduled/background work: PHP cron jobs (video publishing only — comments and analytics are always fetched live)
+- AI providers: **OpenAI** (text content generation) and **Google Gemini** (voice-over generation)
 
 ## Platform Scope
 
@@ -85,6 +86,15 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
   ```
 - `video_operations.video_path` and the `thumbnails` table's image columns store paths within that account's folder, so all of a channel's media stays isolated from every other channel's.
 
+## AI Integrations
+
+Two dedicated backend service functions wrap the AI providers — the rest of the app never calls OpenAI or Gemini directly, it goes through these:
+
+- **OpenAI service** — generates text content: `title`, `description`, `tags`, and the video's `content` (script), driven by the video's `topic`.
+- **Gemini service** — generates the voice-over: takes the video's `content` text and produces an audio narration. Only used when `voice_enabled = 1` on that video.
+
+The generated voice-over audio is stored under the account's storage folder (see File Storage), with its path saved on the `video_operations` row via a new `voice_over_path` column.
+
 ## Endpoints
 
 Every feature in this document is backed by a REST API endpoint — the React frontend never talks to the database directly, it always goes through the PHP REST API.
@@ -140,9 +150,11 @@ Comments are **fetched live from the YouTube API on every request** — there is
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/content/generate/title` | Generate a video title |
-| POST | `/api/content/generate/description` | Generate a video description |
-| POST | `/api/content/generate/tags` | Generate SEO tags/keywords |
+| POST | `/api/content/generate/title` | Generate a video title (OpenAI) |
+| POST | `/api/content/generate/description` | Generate a video description (OpenAI) |
+| POST | `/api/content/generate/tags` | Generate SEO tags/keywords (OpenAI) |
+| POST | `/api/content/generate/content` | Generate the video's script/content text from its `topic` (OpenAI) |
+| POST | `/api/content/generate/voice-over` | Generate a voice-over audio narration from the video's `content` text (Gemini); saves the result to `voice_over_path` |
 | POST | `/api/content/generate/thumbnail` | Generate/suggest a thumbnail image |
 
 ### Thumbnails
@@ -203,6 +215,7 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 | `topic` | VARCHAR | The subject/topic this video is about |
 | `content` | TEXT | The video's script/content text |
 | `voice_enabled` | TINYINT (1 or 0) | Whether AI voice-over/narration is used for this video |
+| `voice_over_path` | VARCHAR | Path/URL to the generated voice-over audio file (from the Gemini voice-over service) |
 | `title` | VARCHAR | Video title |
 | `description` | TEXT | Video description |
 | `tags` | TEXT | SEO tags/keywords |
