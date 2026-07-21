@@ -92,6 +92,27 @@ One row per managed YouTube channel (currently ~10 channels), storing the creden
 | `created_at` | DATETIME | Row creation timestamp |
 | `updated_at` | DATETIME | Last updated timestamp |
 
+### `video_operations`
+
+The main, comprehensive table for videos — one row per video, tracking it through its full lifecycle from upload to publish. Each row references the YouTube channel it belongs to via a foreign key to `accounts`.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INT, PK, auto-increment | Row identifier |
+| `account_id` | INT, FK -> `accounts.id` | The YouTube channel this video belongs to |
+| `video_path` | VARCHAR | Path/URL to the source video file before upload |
+| `title` | VARCHAR | Video title |
+| `description` | TEXT | Video description |
+| `tags` | TEXT | SEO tags/keywords |
+| `thumbnail` | VARCHAR | Path/URL to the thumbnail image |
+| `status` | ENUM(`draft`, `scheduled`, `published`, `failed`) | Current lifecycle state of the video |
+| `youtube_video_id` | VARCHAR | Video ID returned by YouTube after upload (used for comments/analytics lookups) |
+| `scheduled_at` | DATETIME | When the video is scheduled to publish |
+| `published_at` | DATETIME | When the video was actually published |
+| `error_message` | TEXT | Failure reason, populated when `status = 'failed'` |
+| `created_at` | DATETIME | Row creation timestamp |
+| `updated_at` | DATETIME | Last updated timestamp |
+
 ## Out of Scope
 
 - Python is not used anywhere in this project (no scripts, tooling, or services).
