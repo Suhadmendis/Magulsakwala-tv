@@ -27,10 +27,24 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 
 ## Layout
 
-- **Top bar**: app logo/title on the left, navigation links to the main sections (Videos, Comments, Analytics, Thumbnails), and a **YouTube account select box** in the top-right corner.
+### Sitemap
+
+- **Top bar**: minimal — contains only the **YouTube account select box**, on the right side. No logo or nav links here.
+- **Left sidebar**: primary navigation —
+  - Video Operations
+  - Comments
+  - Analytics
+  - Thumbnails
+  - **Compose** (button, opens the Compose screen)
 - The account select box lists all rows from `accounts`. Whichever account is selected becomes the active context for the rest of the app.
 - **All data fetches (videos, comments, analytics) are scoped to the currently selected account** — every list/detail request filters by that account's `id`, never showing data belonging to other accounts.
 - **Thumbnail creator**: a dedicated section/page in the app for creating video thumbnails (separate from just uploading a video). Exact capabilities (upload vs. AI-generated vs. template editor) still to be defined.
+
+### Compose screen
+
+- Opened via the **Compose** button in the left sidebar.
+- Fetches and shows exactly **one** video: for the currently selected account, among `scheduled` videos (already `prepared` and given a `scheduled_at`), pick the one whose `scheduled_at` is closest to the current date/time.
+- Displays a preview of that video — its rendered thumbnail image and its details (title, description, etc.).
 
 ## File Storage
 
@@ -71,6 +85,12 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 | PUT | `/api/videos/{id}` | Update a video's fields (title, description, tags, thumbnail, video_type, etc.); auto-advances `draft` → `prepared` once all required fields are valid |
 | PUT | `/api/videos/{id}/schedule` | Set/update `scheduled_at` on a `prepared` video, moving it to `scheduled` |
 | DELETE | `/api/videos/{id}` | Cancel a scheduled upload or remove a video record |
+
+### Compose
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/compose/next` | Fetch the single `scheduled` video with the `scheduled_at` closest to now, for preview on the Compose screen |
 
 ### Comments
 
