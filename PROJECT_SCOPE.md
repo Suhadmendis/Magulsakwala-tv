@@ -25,7 +25,16 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 
 - Single admin user, no login/authentication required.
 
+## Layout
+
+- **Top bar**: app logo/title on the left, navigation links to the main sections (Videos, Comments, Analytics, Thumbnails), and a **YouTube account select box** in the top-right corner.
+- The account select box lists all rows from `accounts`. Whichever account is selected becomes the active context for the rest of the app.
+- **All data fetches (videos, comments, analytics) are scoped to the currently selected account** — every list/detail request filters by that account's `id`, never showing data belonging to other accounts.
+- **Thumbnail creator**: a dedicated section/page in the app for creating video thumbnails (separate from just uploading a video). Exact capabilities (upload vs. AI-generated vs. template editor) still to be defined.
+
 ## Endpoints
+
+All list/detail endpoints below are scoped to the currently selected YouTube account (e.g. via an `account_id` query param or path segment), per the top bar's account selector.
 
 ### Videos
 
@@ -56,6 +65,14 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 | POST | `/api/content/generate/description` | Generate a video description |
 | POST | `/api/content/generate/tags` | Generate SEO tags/keywords |
 | POST | `/api/content/generate/thumbnail` | Generate/suggest a thumbnail image |
+
+### Thumbnails
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/thumbnails` | List saved/created thumbnails for the selected account |
+| POST | `/api/thumbnails` | Create a new thumbnail (via the dedicated thumbnail creator) |
+| DELETE | `/api/thumbnails/{id}` | Delete a thumbnail |
 
 ### Analytics
 
@@ -105,6 +122,7 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 | `description` | TEXT | Video description |
 | `tags` | TEXT | SEO tags/keywords |
 | `thumbnail` | VARCHAR | Path/URL to the thumbnail image |
+| `video_type` | ENUM(`long`, `short`) | Flag for whether the video is long-form or a YouTube Short |
 | `status` | ENUM(`draft`, `scheduled`, `published`, `failed`) | Current lifecycle state of the video |
 | `youtube_video_id` | VARCHAR | Video ID returned by YouTube after upload (used for comments/analytics lookups) |
 | `scheduled_at` | DATETIME | When the video is scheduled to publish |
