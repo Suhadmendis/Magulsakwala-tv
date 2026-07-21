@@ -148,7 +148,7 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 | `video_path` | VARCHAR | Path/URL to the source video file before upload |
 | `topic` | VARCHAR | The subject/topic this video is about |
 | `content` | TEXT | The video's script/content text |
-| `voice_enabled` | BOOLEAN | Whether AI voice-over/narration is used for this video |
+| `voice_enabled` | TINYINT (1 or 0) | Whether AI voice-over/narration is used for this video |
 | `title` | VARCHAR | Video title |
 | `description` | TEXT | Video description |
 | `tags` | TEXT | SEO tags/keywords |
