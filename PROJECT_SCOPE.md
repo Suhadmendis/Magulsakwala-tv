@@ -37,6 +37,7 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
   - Comments
   - Analytics
   - Thumbnails
+  - Findings
   - **Compose** (button, opens the Compose screen)
 - The account select box lists all rows from `accounts`. Whichever account is selected becomes the active context for the rest of the app.
 - **All data fetches (videos, comments, analytics) are scoped to the currently selected account** — every list/detail request filters by that account's `id`, never showing data belonging to other accounts.
@@ -55,6 +56,20 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 - Displays a preview of that video — its rendered thumbnail image and its details (title, description, etc.).
 - A **Post** button publishes that previewed video to the selected YouTube channel right now (does not wait for its `scheduled_at`/the cron job). Under the hood this calls the same `POST /api/videos/post-next` endpoint below, passing the currently selected account's `id`.
 
+### Findings page
+
+- A textarea where a large JSON payload can be pasted, plus a **Post** button.
+- The JSON is just a list of elements, where each element has only a `topic` field:
+  ```json
+  {
+    "elements": [
+      { "topic": "..." },
+      { "topic": "..." }
+    ]
+  }
+  ```
+- Posting it **bulk-creates one `video_operations` row per element**: `topic` is set from the element, `account_id` is auto-filled from the currently selected account (not something you specify in the JSON), and `status` is always `draft` — every other field (`content`, `voice_enabled`, `thumbnail_ref`, `title`, `description`, `tags`, `video_path`, etc.) is left empty, since a topic alone isn't enough to reach `prepared`.
+
 ## File Storage
 
 - All media (videos, thumbnail components, rendered thumbnails) is stored **locally on disk within the project** — no cloud storage.
@@ -71,6 +86,8 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 - `video_operations.video_path` and the `thumbnails` table's image columns store paths within that account's folder, so all of a channel's media stays isolated from every other channel's.
 
 ## Endpoints
+
+Every feature in this document is backed by a REST API endpoint — the React frontend never talks to the database directly, it always goes through the PHP REST API.
 
 All list/detail endpoints below are scoped to the currently selected YouTube account (e.g. via an `account_id` query param or path segment), per the top bar's account selector.
 
@@ -102,6 +119,12 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 |---|---|---|
 | GET | `/api/compose/next` | Fetch the single `scheduled` video with the `scheduled_at` closest to now, for preview on the Compose screen |
 | POST | `/api/videos/post-next` | Publish the next prepared/scheduled video (closest `scheduled_at`) for a given YouTube channel directly to YouTube. Takes the channel's `account_id` (the `accounts.id` ref) in the request body. Usable both from the Compose screen's Post button and as a standalone REST call (e.g. triggered externally). Updates the video's `status` to `published`, and sets `youtube_video_id`/`published_at`. |
+
+### Findings
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/findings/import` | Bulk-create `draft` `video_operations` rows from a pasted JSON payload (`{ "elements": [{ "topic": "..." }, ...] }`). Only `topic` is set per row; `account_id` is auto-filled from the currently selected account. |
 
 ### Comments
 
