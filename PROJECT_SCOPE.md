@@ -101,10 +101,12 @@ A single dedicated Comments page lists all comments for the selected account. Co
 
 ### Analytics
 
+Analytics are **fetched live from the YouTube API on every request** — there is no local `analytics` table and no caching/cron sync. Each call below hits YouTube directly using the selected account's stored credentials and returns fresh data.
+
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/analytics/channel` | Channel-level stats (views, watch time, subscribers) |
-| GET | `/api/analytics/videos/{id}` | Per-video performance stats |
+| GET | `/api/analytics/channel` | Live channel-level stats (views, watch time, subscribers) |
+| GET | `/api/analytics/videos/{id}` | Live per-video performance stats |
 
 ### Background Jobs (PHP Cron, not public endpoints)
 
