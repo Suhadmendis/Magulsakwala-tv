@@ -122,7 +122,7 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 | `title` | VARCHAR | Video title |
 | `description` | TEXT | Video description |
 | `tags` | TEXT | SEO tags/keywords |
-| `thumbnail` | VARCHAR | Path/URL to the thumbnail image |
+| `thumbnail_ref` | INT, FK -> `thumbnails.id` | The thumbnail composition for this video (see `thumbnails` table) |
 | `video_type` | ENUM(`long`, `short`) | Flag for whether the video is long-form or a YouTube Short |
 | `status` | ENUM(`draft`, `prepared`, `scheduled`, `published`, `failed`) | Current lifecycle state of the video |
 | `youtube_video_id` | VARCHAR | Video ID returned by YouTube after upload (used for comments/analytics lookups) |
@@ -135,12 +135,33 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 #### Status workflow
 
 - **`draft`** — initial state when a video record is created. Fields (including `video_type`) can be partially filled in and saved at any time.
-- **`prepared`** — the video is only allowed to move from `draft` to `prepared` once every required field is validly filled in: `title`, `description`, `tags`, `thumbnail`, `video_type`, and the video file itself (`video_path`). If any required field is missing, the update is rejected/stays in `draft`.
+- **`prepared`** — the video is only allowed to move from `draft` to `prepared` once every required field is validly filled in: `title`, `description`, `tags`, `thumbnail_ref`, `video_type`, and the video file itself (`video_path`). If any required field is missing, the update is rejected/stays in `draft`.
 - **`scheduled`** — a `prepared` video that has been given a `scheduled_at` time, queued for publishing.
 - **`published`** — the cron job successfully published the video to YouTube (`youtube_video_id` and `published_at` populated).
 - **`failed`** — the publish attempt failed (`error_message` populated).
 
 `video_type` is selected manually by the user while editing the video in `draft`, and is one of the required fields checked before the video is allowed to advance to `prepared`.
+
+### `thumbnails`
+
+One row per video (1:1 with `video_operations`, linked back via `video_operations.thumbnail_ref`), holding the individual components used to build that video's thumbnail plus the final rendered result.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INT, PK, auto-increment | Row identifier |
+| `video_id` | INT, FK -> `video_operations.id`, UNIQUE | The video this thumbnail belongs to |
+| `background_image` | VARCHAR | Path/URL to the background image |
+| `image_1` | VARCHAR | Overlay image slot 1 (e.g. a logo or graphic) |
+| `image_2` | VARCHAR | Overlay image slot 2 |
+| `image_3` | VARCHAR | Overlay image slot 3 |
+| `image_4` | VARCHAR | Overlay image slot 4 |
+| `image_5` | VARCHAR | Overlay image slot 5 |
+| `text_1` | VARCHAR | Text element 1 (e.g. main title text) |
+| `text_2` | VARCHAR | Text element 2 |
+| `text_3` | VARCHAR | Text element 3 |
+| `rendered_image` | VARCHAR | Path/URL to the final composited thumbnail image (background + images + text merged) |
+| `created_at` | DATETIME | Row creation timestamp |
+| `updated_at` | DATETIME | Last updated timestamp |
 
 ## Out of Scope
 
