@@ -146,6 +146,9 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 | `id` | INT, PK, auto-increment | Row identifier |
 | `account_id` | INT, FK -> `accounts.id` | The YouTube channel this video belongs to |
 | `video_path` | VARCHAR | Path/URL to the source video file before upload |
+| `topic` | VARCHAR | The subject/topic this video is about |
+| `content` | TEXT | The video's script/content text |
+| `voice_enabled` | BOOLEAN | Whether AI voice-over/narration is used for this video |
 | `title` | VARCHAR | Video title |
 | `description` | TEXT | Video description |
 | `tags` | TEXT | SEO tags/keywords |
