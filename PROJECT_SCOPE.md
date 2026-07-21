@@ -45,6 +45,7 @@ Magulsakwala-tv is a social media automation web application focused on YouTube 
 - Opened via the **Compose** button in the left sidebar.
 - Fetches and shows exactly **one** video: for the currently selected account, among `scheduled` videos (already `prepared` and given a `scheduled_at`), pick the one whose `scheduled_at` is closest to the current date/time.
 - Displays a preview of that video — its rendered thumbnail image and its details (title, description, etc.).
+- A **Post** button publishes that previewed video to the selected YouTube channel right now (does not wait for its `scheduled_at`/the cron job). Under the hood this calls the same `POST /api/videos/post-next` endpoint below, passing the currently selected account's `id`.
 
 ## File Storage
 
@@ -91,6 +92,7 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/api/compose/next` | Fetch the single `scheduled` video with the `scheduled_at` closest to now, for preview on the Compose screen |
+| POST | `/api/videos/post-next` | Publish the next prepared/scheduled video (closest `scheduled_at`) for a given YouTube channel directly to YouTube. Takes the channel's `account_id` (the `accounts.id` ref) in the request body. Usable both from the Compose screen's Post button and as a standalone REST call (e.g. triggered externally). Updates the video's `status` to `published`, and sets `youtube_video_id`/`published_at`. |
 
 ### Comments
 
