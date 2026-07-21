@@ -40,10 +40,11 @@ All list/detail endpoints below are scoped to the currently selected YouTube acc
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/videos/upload` | Upload a video and optionally schedule its publish time |
-| GET | `/api/videos` | List videos (uploaded, scheduled, published) |
+| POST | `/api/videos/upload` | Upload a video and create its `draft` record |
+| GET | `/api/videos` | List videos (draft, prepared, scheduled, published, failed) |
 | GET | `/api/videos/{id}` | Get details for a single video |
-| PUT | `/api/videos/{id}/schedule` | Update a video's scheduled publish time |
+| PUT | `/api/videos/{id}` | Update a video's fields (title, description, tags, thumbnail, video_type, etc.); auto-advances `draft` → `prepared` once all required fields are valid |
+| PUT | `/api/videos/{id}/schedule` | Set/update `scheduled_at` on a `prepared` video, moving it to `scheduled` |
 | DELETE | `/api/videos/{id}` | Cancel a scheduled upload or remove a video record |
 
 ### Comments (Auto-Reply)
@@ -123,13 +124,23 @@ The main, comprehensive table for videos — one row per video, tracking it thro
 | `tags` | TEXT | SEO tags/keywords |
 | `thumbnail` | VARCHAR | Path/URL to the thumbnail image |
 | `video_type` | ENUM(`long`, `short`) | Flag for whether the video is long-form or a YouTube Short |
-| `status` | ENUM(`draft`, `scheduled`, `published`, `failed`) | Current lifecycle state of the video |
+| `status` | ENUM(`draft`, `prepared`, `scheduled`, `published`, `failed`) | Current lifecycle state of the video |
 | `youtube_video_id` | VARCHAR | Video ID returned by YouTube after upload (used for comments/analytics lookups) |
 | `scheduled_at` | DATETIME | When the video is scheduled to publish |
 | `published_at` | DATETIME | When the video was actually published |
 | `error_message` | TEXT | Failure reason, populated when `status = 'failed'` |
 | `created_at` | DATETIME | Row creation timestamp |
 | `updated_at` | DATETIME | Last updated timestamp |
+
+#### Status workflow
+
+- **`draft`** — initial state when a video record is created. Fields (including `video_type`) can be partially filled in and saved at any time.
+- **`prepared`** — the video is only allowed to move from `draft` to `prepared` once every required field is validly filled in: `title`, `description`, `tags`, `thumbnail`, `video_type`, and the video file itself (`video_path`). If any required field is missing, the update is rejected/stays in `draft`.
+- **`scheduled`** — a `prepared` video that has been given a `scheduled_at` time, queued for publishing.
+- **`published`** — the cron job successfully published the video to YouTube (`youtube_video_id` and `published_at` populated).
+- **`failed`** — the publish attempt failed (`error_message` populated).
+
+`video_type` is selected manually by the user while editing the video in `draft`, and is one of the required fields checked before the video is allowed to advance to `prepared`.
 
 ## Out of Scope
 
