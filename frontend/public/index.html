@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magulsakwala-tv</title>
+<link rel="stylesheet" href="src/styles.css">
+<script>
+  // Point this at the PHP backend if it's served from a different origin
+  // than this frontend. Leave as '' if both are served from the same origin.
+  window.API_BASE = window.API_BASE || 'http://localhost:8100';
+</script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Vendored libraries (no npm/Node — see CLAUDE.md). Downloaded once from
+     the npm registry tarballs and committed as static files. -->
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/babel.min.js"></script>
+
+<script src="src/api.js"></script>
+
+<script type="text/babel" data-presets="react" src="src/components/TopBar.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/Sidebar.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/AccountEditPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/VideoOperationsPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/ComposeScreen.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/FindingsPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/CommentsPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/ThumbnailsEditor.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/AnalyticsPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/app.jsx"></script>
+</body>
+</html>
