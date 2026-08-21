@@ -85,18 +85,20 @@ class ContentController
         }
 
         try {
-            $gemini = new GeminiService();
-            $pcm = $gemini->generateVoiceOver($video['content']);
-            $wav = $gemini->pcmToWav($pcm);
+            $wav = (new KokoroService())->generateVoiceOver($video['content']);
 
-            $filename = 'voice_over_' . $video['id'] . '_' . time() . '.wav';
-            $path = (new StorageService())->saveContent((int) $video['account_id'], 'videos', $filename, $wav);
+            $objectPath = "accounts/{$video['account_id']}/audio/voice_over_{$video['id']}_" . time() . '.wav';
+            $storage = new SupabaseStorageService();
+            $storage->uploadBytes('media', $objectPath, $wav, 'audio/wav');
 
             $db = Database::connection();
             $stmt = $db->prepare('UPDATE video_operations SET voice_over_path = ? WHERE id = ?');
-            $stmt->execute([$path, $video['id']]);
+            $stmt->execute([$objectPath, $video['id']]);
 
-            Response::json(['voice_over_path' => $path]);
+            Response::json([
+                'voice_over_path' => $objectPath,
+                'voice_over_url' => $storage->signedUrl('media', $objectPath),
+            ]);
         } catch (Throwable $e) {
             Response::error($e->getMessage(), 502);
         }

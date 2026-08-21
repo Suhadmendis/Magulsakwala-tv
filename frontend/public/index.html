@@ -9,6 +9,15 @@
   // Point this at the PHP backend if it's served from a different origin
   // than this frontend. Leave as '' if both are served from the same origin.
   window.API_BASE = window.API_BASE || 'http://localhost:8100';
+
+  // Apply saved theme before first paint (avoids a flash of the wrong
+  // theme). No saved preference = follow the OS (handled by CSS alone).
+  (function () {
+    var saved = localStorage.getItem('theme');
+    if (saved === 'light' || saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+  })();
 </script>
 </head>
 <body>
@@ -22,15 +31,20 @@
 
 <script src="src/api.js"></script>
 
+<script type="text/babel" data-presets="react" src="src/components/Toast.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/ConfirmDialog.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/TopBar.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/Sidebar.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/AccountEditPage.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/VideoOperationsPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/ContentFeederPage.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/ComposeScreen.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/FindingsPage.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/CommentsPage.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/ThumbnailsEditor.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/AssetsPage.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/components/AnalyticsPage.jsx"></script>
+<script type="text/babel" data-presets="react" src="src/components/SystemPage.jsx"></script>
 <script type="text/babel" data-presets="react" src="src/app.jsx"></script>
 </body>
 </html>

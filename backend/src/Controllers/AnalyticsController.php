@@ -11,7 +11,7 @@ class AnalyticsController
     /** Live channel-level stats (views, watch time proxy, subscribers). No caching. */
     public static function channel(array $params): void
     {
-        $account = self::requireAccount(Request::query('account_id'));
+        $account = AccountsController::requireAccount(Request::query('account_id'));
         if (!$account) {
             return;
         }
@@ -36,13 +36,8 @@ class AnalyticsController
             return;
         }
 
-        $db = Database::connection();
-        $stmt = $db->prepare('SELECT * FROM accounts WHERE id = ?');
-        $stmt->execute([$video['account_id']]);
-        $account = $stmt->fetch();
-
+        $account = AccountsController::requireAccount($video['account_id']);
         if (!$account) {
-            Response::error('Account not found', 404);
             return;
         }
 
@@ -51,25 +46,5 @@ class AnalyticsController
         } catch (Throwable $e) {
             Response::error($e->getMessage(), 502);
         }
-    }
-
-    private static function requireAccount($accountId): ?array
-    {
-        if (!$accountId) {
-            Response::error('account_id is required', 422);
-            return null;
-        }
-
-        $db = Database::connection();
-        $stmt = $db->prepare('SELECT * FROM accounts WHERE id = ?');
-        $stmt->execute([$accountId]);
-        $account = $stmt->fetch();
-
-        if (!$account) {
-            Response::error('Account not found', 404);
-            return null;
-        }
-
-        return $account;
     }
 }

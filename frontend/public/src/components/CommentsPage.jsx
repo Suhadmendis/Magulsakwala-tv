@@ -5,6 +5,7 @@ function CommentsPage() {
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState({}); // youtube_comment_id -> reply text
   const [busy, setBusy] = useState(null);
+  const toast = useToast();
 
   const load = useCallback(() => {
     if (!selectedAccountId) return;
@@ -30,7 +31,7 @@ function CommentsPage() {
     if (!text) return;
     setBusy(comment.youtube_comment_id);
     Api.comments.reply(comment.youtube_comment_id, selectedAccountId, text)
-      .then(() => load())
+      .then(() => { toast.show('Reply sent'); load(); })
       .catch((e) => setError(e.message))
       .finally(() => setBusy(null));
   };

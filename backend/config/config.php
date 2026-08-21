@@ -15,13 +15,11 @@ if (!function_exists('env')) {
 
 return [
     'db' => [
-        'driver' => env('DB_DRIVER', 'mysql'), // 'mysql' or 'sqlite'
-        'host' => env('DB_HOST', '127.0.0.1'),
-        'port' => env('DB_PORT', '3306'),
-        'name' => env('DB_NAME', 'magulsakwala_tv'),
-        'user' => env('DB_USER', 'root'),
+        'host' => env('DB_HOST', 'db.ddjrybbhhcwuiczwncfc.supabase.co'),
+        'port' => env('DB_PORT', '5432'),
+        'name' => env('DB_NAME', 'postgres'),
+        'user' => env('DB_USER', 'postgres'),
         'password' => env('DB_PASSWORD', ''),
-        'sqlite_path' => env('DB_SQLITE_PATH', __DIR__ . '/../database/dev.sqlite'),
     ],
     'storage' => [
         // Root folder that holds one subfolder per account.
@@ -31,14 +29,26 @@ return [
         'api_key' => env('OPENAI_API_KEY', ''),
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY', ''),
-        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
-        'tts_model' => env('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts'),
+    'kokoro' => [
+        'api_url' => env('KOKORO_API_URL', ''),
+        'api_key' => env('KOKORO_API_KEY', ''),
+    ],
+    'imagegen' => [
+        'api_url' => env('IMAGEGEN_API_URL', ''),
+    ],
+    'supabase' => [
+        'url' => env('SUPABASE_URL', ''),
+        'service_role_key' => env('SUPABASE_SERVICE_ROLE_KEY', ''),
     ],
     'youtube' => [
         'api_base' => 'https://www.googleapis.com/youtube/v3',
         'upload_base' => 'https://www.googleapis.com/upload/youtube/v3',
         'oauth_token_url' => 'https://oauth2.googleapis.com/token',
+        'oauth_auth_url' => 'https://accounts.google.com/o/oauth2/v2/auth',
+        // Must exactly match an "Authorized redirect URI" on the Google
+        // Cloud OAuth client (Web application type).
+        'oauth_redirect_uri' => env('YOUTUBE_OAUTH_REDIRECT_URI', 'http://localhost:8100/api/oauth/youtube/callback'),
     ],
+    // Where to send the browser back after the OAuth callback finishes.
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:8000'),
 ];

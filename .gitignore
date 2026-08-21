@@ -4,6 +4,14 @@ backend/.env
 # Local SQLite dev database
 backend/database/dev.sqlite
 
+# Kokoro TTS local server (venv + downloaded model weights, ~350MB)
+kokoro-tts/venv/
+kokoro-tts/models/
+
+# SD-Turbo image-gen local server (venv; model weights cache to
+# ~/.cache/huggingface, outside the project)
+image-gen/venv/
+
 # Uploaded/generated media (per-account storage folders)
 storage/accounts/*
 !storage/accounts/.gitkeep

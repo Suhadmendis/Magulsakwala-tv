@@ -53,10 +53,15 @@ class ThumbnailsController
         $existing = $stmt->fetch();
 
         $paths = $existing ?: [];
-        foreach (self::IMAGE_SLOTS as $slot) {
-            if (!empty($_FILES[$slot]) && $_FILES[$slot]['error'] === UPLOAD_ERR_OK) {
-                $paths[$slot] = $storage->saveUploadedFile((int) $accountId, 'thumbnails', $_FILES[$slot]);
+        try {
+            foreach (self::IMAGE_SLOTS as $slot) {
+                if (!empty($_FILES[$slot]) && $_FILES[$slot]['error'] === UPLOAD_ERR_OK) {
+                    $paths[$slot] = $storage->saveUploadedFile((int) $accountId, 'thumbnails', $_FILES[$slot]);
+                }
             }
+        } catch (RuntimeException $e) {
+            Response::error($e->getMessage(), 502);
+            return;
         }
 
         $texts = [
@@ -72,7 +77,12 @@ class ThumbnailsController
             $texts
         );
 
-        $renderedImage = (new ThumbnailRenderService())->render($thumbnailData, (int) $accountId);
+        try {
+            $renderedImage = (new ThumbnailRenderService())->render($thumbnailData, (int) $accountId);
+        } catch (RuntimeException $e) {
+            Response::error($e->getMessage(), 502);
+            return;
+        }
 
         if ($existing) {
             $sql = 'UPDATE thumbnails SET
@@ -118,6 +128,20 @@ class ThumbnailsController
     public static function destroy(array $params): void
     {
         $db = Database::connection();
+        $stmt = $db->prepare('SELECT * FROM thumbnails WHERE id = ?');
+        $stmt->execute([$params['id']]);
+        $thumbnail = $stmt->fetch();
+
+        if (!$thumbnail) {
+            Response::error('Thumbnail not found', 404);
+            return;
+        }
+
+        $storage = new StorageService();
+        foreach (array_merge(self::IMAGE_SLOTS, ['rendered_image']) as $field) {
+            $storage->deleteFile($thumbnail[$field]);
+        }
+
         $stmt = $db->prepare('DELETE FROM thumbnails WHERE id = ?');
         $stmt->execute([$params['id']]);
         Response::json(['deleted' => true]);

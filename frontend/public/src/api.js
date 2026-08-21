@@ -61,6 +61,17 @@
       schedule: (id, scheduledAt) => request('PUT', `/api/videos/${id}/schedule`, { json: { scheduled_at: scheduledAt } }),
       remove: (id) => request('DELETE', `/api/videos/${id}`),
       upload: (form) => request('POST', '/api/videos/upload', { form }),
+      render: (id) => request('POST', `/api/videos/${id}/render`),
+    },
+    zodiacVideos: {
+      list: (accountId) => request('GET', '/api/zodiac-videos', { query: { account_id: accountId } }),
+      get: (id) => request('GET', `/api/zodiac-videos/${id}`),
+      update: (id, body) => request('PUT', `/api/zodiac-videos/${id}`, { json: body }),
+      generateVoiceOver: (id) => request('POST', `/api/zodiac-videos/${id}/generate-voice-over`),
+      generateThumbnail: (id) => request('POST', `/api/zodiac-videos/${id}/generate-thumbnail`),
+      render: (id) => request('POST', `/api/zodiac-videos/${id}/render`),
+      deleteMedia: (id) => request('DELETE', `/api/zodiac-videos/${id}/media`),
+      deleteThumbnail: (id) => request('DELETE', `/api/zodiac-videos/${id}/thumbnail`),
     },
     compose: {
       next: (accountId) => request('GET', '/api/compose/next', { query: { account_id: accountId } }),
@@ -88,9 +99,37 @@
       save: (form) => request('POST', '/api/thumbnails', { form }),
       remove: (id) => request('DELETE', `/api/thumbnails/${id}`),
     },
+    thumbnailPresets: {
+      list: (channelId) => request('GET', '/api/thumbnail-presets', { query: { channel_id: channelId } }),
+      save: (form) => request('POST', '/api/thumbnail-presets', { form }),
+      remove: (id) => request('DELETE', `/api/thumbnail-presets/${id}`),
+    },
+    contentFeeder: {
+      list: (accountId) => request('GET', '/api/content-feeder', { query: { account_id: accountId } }),
+      listForZodiacVideo: (zodiacVideoRef) => request('GET', '/api/content-feeder', { query: { zodiac_video_ref: zodiacVideoRef } }),
+      create: (body) => request('POST', '/api/content-feeder', { json: body }),
+      update: (id, body) => request('PUT', `/api/content-feeder/${id}`, { json: body }),
+      remove: (id) => request('DELETE', `/api/content-feeder/${id}`),
+      generateHook: (videoId) => request('POST', '/api/content-feeder/generate/hook', { json: { video_id: videoId } }),
+      generateContent: (videoId) => request('POST', '/api/content-feeder/generate/content', { json: { video_id: videoId } }),
+      generateCta: (videoId) => request('POST', '/api/content-feeder/generate/cta', { json: { video_id: videoId } }),
+    },
     analytics: {
       channel: (accountId) => request('GET', '/api/analytics/channel', { query: { account_id: accountId } }),
       video: (videoId) => request('GET', `/api/analytics/videos/${videoId}`),
+    },
+    system: {
+      tables: () => request('GET', '/api/system/tables'),
+      tableDetail: (name) => request('GET', `/api/system/tables/${name}`),
+      imageGenInfo: () => request('GET', '/api/system/imagegen/info'),
+      imageGenGenerate: (body) => request('POST', '/api/system/imagegen/generate', { json: body }),
+      imageGenImg2Img: (form) => request('POST', '/api/system/imagegen/img2img', { form }),
+    },
+    assets: {
+      list: (category, channelId) => request('GET', `/api/assets/${category}`, { query: { channel_id: channelId } }),
+      create: (category, form) => request('POST', `/api/assets/${category}`, { form }),
+      generate: (category, body) => request('POST', `/api/assets/${category}/generate`, { json: body }),
+      remove: (category, id) => request('DELETE', `/api/assets/${category}/${id}`),
     },
   };
 })();

@@ -1,7 +1,31 @@
 <?php
 
 error_reporting(E_ALL);
-ini_set('display_errors', '1');
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
+// Never leak raw PHP errors/stack traces to the frontend - log them and
+// respond with a plain JSON 500 instead.
+set_exception_handler(function (Throwable $e): void {
+    error_log((string) $e);
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+    }
+    echo json_encode(['error' => 'Internal server error']);
+});
+
+register_shutdown_function(function (): void {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        error_log($error['message'] . ' in ' . $error['file'] . ':' . $error['line']);
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Internal server error']);
+        }
+    }
+});
 
 // Load a .env file (KEY=VALUE per line) into getenv(), if present.
 $envFile = __DIR__ . '/../.env';

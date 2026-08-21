@@ -1,23 +1,147 @@
-function statusPillClass(status) {
-  return 'status-pill status-' + status;
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+function wordCount(text) {
+  return text && text.trim() ? text.trim().split(/\s+/).length : 0;
 }
 
 function VideoOperationsPage() {
   const { selectedAccountId } = useAccountContext();
-  const [videos, setVideos] = useState([]);
-  const [selectedVideo, setSelectedVideo] = useState(null);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [error, setError] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [zodiacVideos, setZodiacVideos] = useState([]);
+  const [contentByZodiacVideo, setContentByZodiacVideo] = useState({});
+  const [thumbById, setThumbById] = useState({});
+  const [creatingId, setCreatingId] = useState(null);
+  const [creatingPhase, setCreatingPhase] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [runningAll, setRunningAll] = useState(false);
+  const [runProgress, setRunProgress] = useState(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(null);
+  const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false);
+  const toast = useToast();
 
   const load = useCallback(() => {
     if (!selectedAccountId) return;
-    Api.videos.list(selectedAccountId).then(setVideos).catch((e) => setError(e.message));
+    Api.zodiacVideos.list(selectedAccountId).then(setZodiacVideos).catch((e) => setError(e.message));
+    Api.contentFeeder.list(selectedAccountId)
+      .then((entries) => {
+        const map = {};
+        entries.forEach((e) => {
+          if (e.zodiac_video_ref && !map[e.zodiac_video_ref]) map[e.zodiac_video_ref] = e.content;
+        });
+        setContentByZodiacVideo(map);
+      })
+      .catch(() => {});
+    Api.thumbnailPresets.list(selectedAccountId)
+      .then((list) => {
+        const map = {};
+        list.forEach((t) => { map[t.id] = t; });
+        setThumbById(map);
+      })
+      .catch(() => {});
   }, [selectedAccountId]);
 
   useEffect(load, [load]);
 
-  const openVideo = (id) => {
-    Api.videos.get(id).then(setSelectedVideo).catch((e) => setError(e.message));
+  const createAudioAndVideo = (zv) => {
+    setCreatingId(zv.id);
+    setCreatingPhase('audio');
+    setError(null);
+    Api.zodiacVideos.generateVoiceOver(zv.id)
+      .then(() => { setCreatingPhase('thumbnail'); return Api.zodiacVideos.generateThumbnail(zv.id); })
+      .then(() => { setCreatingPhase('video'); return Api.zodiacVideos.render(zv.id); })
+      .then(() => { toast.show(`${capitalize(zv.zodiac_sign)} audio + video created`); load(); })
+      .catch((e) => setError(e.message))
+      .finally(() => { setCreatingId(null); setCreatingPhase(null); });
+  };
+
+  const deleteMedia = (zv) => {
+    setDeletingId(zv.id);
+    setError(null);
+    Api.zodiacVideos.deleteMedia(zv.id)
+      .then(() => { toast.show(`${capitalize(zv.zodiac_sign)} audio + video deleted`); load(); })
+      .catch((e) => setError(e.message))
+      .finally(() => setDeletingId(null));
+  };
+
+  const createAll = () => {
+    const queue = zodiacVideos.filter((zv) => !(zv.voice_over_url && zv.rendered_video_url));
+    if (queue.length === 0) {
+      toast.show('Every sign already has audio + video');
+      return;
+    }
+    setError(null);
+    setRunningAll(true);
+
+    const step = (i) => {
+      if (i >= queue.length) {
+        setRunningAll(false);
+        setRunProgress(null);
+        setCreatingId(null);
+        toast.show('Create All finished');
+        load();
+        return;
+      }
+      const zv = queue[i];
+      setCreatingId(zv.id);
+      setCreatingPhase('audio');
+      setRunProgress({ index: i + 1, total: queue.length, sign: capitalize(zv.zodiac_sign) });
+      Api.zodiacVideos.generateVoiceOver(zv.id)
+        .then(() => { setCreatingPhase('thumbnail'); return Api.zodiacVideos.generateThumbnail(zv.id); })
+        .then(() => { setCreatingPhase('video'); return Api.zodiacVideos.render(zv.id); })
+        .then(() => step(i + 1))
+        .catch((e) => {
+          setError(`${capitalize(zv.zodiac_sign)}: ${e.message}`);
+          setRunningAll(false);
+          setRunProgress(null);
+          setCreatingId(null);
+          setCreatingPhase(null);
+          load();
+        });
+    };
+    step(0);
+  };
+
+  const deleteAll = () => {
+    setConfirmDeleteAllOpen(false);
+    const queue = zodiacVideos.filter((zv) => zv.voice_over_url || zv.rendered_video_url || zv.thumbnail_preset_ref);
+    if (queue.length === 0) {
+      toast.show('Nothing to delete');
+      return;
+    }
+    setError(null);
+    setDeletingAll(true);
+
+    const step = (i) => {
+      if (i >= queue.length) {
+        setDeletingAll(false);
+        setDeleteProgress(null);
+        setDeletingId(null);
+        toast.show('Delete All finished');
+        load();
+        return;
+      }
+      const zv = queue[i];
+      setDeletingId(zv.id);
+      setDeleteProgress({ index: i + 1, total: queue.length, sign: capitalize(zv.zodiac_sign) });
+      Promise.all([
+        (zv.voice_over_url || zv.rendered_video_url) ? Api.zodiacVideos.deleteMedia(zv.id) : Promise.resolve(),
+        zv.thumbnail_preset_ref ? Api.zodiacVideos.deleteThumbnail(zv.id) : Promise.resolve(),
+      ])
+        .then(() => step(i + 1))
+        .catch((e) => {
+          setError(`${capitalize(zv.zodiac_sign)}: ${e.message}`);
+          setDeletingAll(false);
+          setDeleteProgress(null);
+          setDeletingId(null);
+          load();
+        });
+    };
+    step(0);
   };
 
   return (
@@ -25,234 +149,226 @@ function VideoOperationsPage() {
       <div className="page-title">Video Operations</div>
       {error && <div className="error-banner">{error}</div>}
 
-      <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
-        <button className="btn" onClick={() => setSearchOpen(true)}>Search</button>
+      <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 4 }}>Selected topic</div>
+          <div>{selectedTopic ? (selectedTopic.topic || selectedTopic.title) : 'None selected'}</div>
+        </div>
+        <button className="btn" onClick={() => setPickerOpen(true)}>
+          {selectedTopic ? 'Change topic' : 'Select topic'}
+        </button>
       </div>
 
-      <div className="card">
-        <table className="table">
-          <thead>
-            <tr><th>Title / Topic</th><th>Type</th><th>Status</th><th>Scheduled</th><th></th></tr>
-          </thead>
-          <tbody>
-            {videos.map((v) => (
-              <tr key={v.id}>
-                <td>{v.title || v.topic || '(untitled)'}</td>
-                <td>{v.video_type || '—'}</td>
-                <td><span className={statusPillClass(v.status)}>{v.status}</span></td>
-                <td>{v.scheduled_at || '—'}</td>
-                <td><button className="btn" onClick={() => openVideo(v.id)}>Edit</button></td>
-              </tr>
-            ))}
-            {videos.length === 0 && (
-              <tr><td colSpan="5" className="empty-state">No videos yet. Use Findings or the Compose screen to create one.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {selectedTopic && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 }}>
+            <div style={{ flex: 1 }}>
+              <div className="page-title" style={{ fontSize: 16 }}>Zodiac Sign Videos</div>
+              <p className="page-subtitle">
+                {runningAll && runProgress
+                  ? `Creating ${runProgress.sign} (${runProgress.index}/${runProgress.total})…`
+                  : deletingAll && deleteProgress
+                  ? `Deleting ${deleteProgress.sign} (${deleteProgress.index}/${deleteProgress.total})…`
+                  : 'The 12 zodiac sign video slots for this channel.'}
+              </p>
+              {runningAll && runProgress && (
+                <div className="progress-track">
+                  <div className="progress-fill" style={{ width: `${(runProgress.index / runProgress.total) * 100}%` }} />
+                </div>
+              )}
+              {deletingAll && deleteProgress && (
+                <div className="progress-track">
+                  <div className="progress-fill progress-fill-danger" style={{ width: `${(deleteProgress.index / deleteProgress.total) * 100}%` }} />
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary" disabled={runningAll || deletingAll} onClick={createAll}>
+                {runningAll ? 'Creating…' : 'Create All'}
+              </button>
+              <button className="btn btn-danger" disabled={deletingAll || runningAll} onClick={() => setConfirmDeleteAllOpen(true)}>
+                {deletingAll ? 'Deleting…' : 'Delete All'}
+              </button>
+            </div>
+          </div>
 
-      {searchOpen && (
-        <VideoSearchDialog
-          accountId={selectedAccountId}
-          onClose={() => setSearchOpen(false)}
-          onSelect={(video) => { setSearchOpen(false); setSelectedVideo(video); }}
-        />
+          <ConfirmDialog
+            open={confirmDeleteAllOpen}
+            title="Delete all thumbnails, audio and video?"
+            message="This removes the generated thumbnail, voice-over, and rendered video for every sign in this list. Fed content and titles are kept. This can't be undone."
+            busy={deletingAll}
+            onConfirm={deleteAll}
+            onCancel={() => setConfirmDeleteAllOpen(false)}
+          />
+          <AriesPreview zodiacVideos={zodiacVideos} thumbById={thumbById} />
+
+          <div className="card">
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Sign</th><th>Thumbnail</th><th>Title</th><th>Word Count</th>
+                    <th>Type</th><th>Status</th><th>Audio</th><th>Video</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zodiacVideos.map((zv) => {
+                    const thumb = zv.thumbnail_preset_ref ? thumbById[zv.thumbnail_preset_ref] : null;
+                    const content = contentByZodiacVideo[zv.id];
+                    return (
+                      <tr key={zv.id} style={{ height: 130 }}>
+                        <td>{capitalize(zv.zodiac_sign)}</td>
+                        <td>
+                          {creatingId === zv.id && creatingPhase === 'thumbnail' ? (
+                            <span><span className="spinner" />Generating…</span>
+                          ) : thumb && thumb.rendered_image ? (
+                            <img src={storageUrl(thumb.rendered_image)} alt="" width="120" height="68" style={{ objectFit: 'cover', borderRadius: 4 }} />
+                          ) : (
+                            <div className="table-thumb-placeholder" style={{ width: 120, height: 68 }} />
+                          )}
+                        </td>
+                        <td>{zv.title || '(untitled)'}</td>
+                        <td>{content ? `${wordCount(content)} words` : '—'}</td>
+                        <td>{zv.video_type || '—'}</td>
+                        <td><StatusPill status={zv.status} /></td>
+                        <td>
+                          {creatingId === zv.id && creatingPhase === 'audio' ? (
+                            <span><span className="spinner" />Generating…</span>
+                          ) : zv.voice_over_url ? (
+                            <audio controls preload="none" src={zv.voice_over_url} style={{ height: 32, width: 160 }} />
+                          ) : 'Not ready'}
+                        </td>
+                        <td>
+                          {creatingId === zv.id && creatingPhase === 'video' ? (
+                            <span><span className="spinner" />Rendering…</span>
+                          ) : zv.rendered_video_url ? (
+                            <video
+                              controls preload="none" width="120" height="68"
+                              poster={thumb && thumb.rendered_image ? storageUrl(thumb.rendered_image) : undefined}
+                              src={zv.rendered_video_url}
+                              style={{ objectFit: 'cover', borderRadius: 4 }}
+                            />
+                          ) : 'Not ready'}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn" onClick={() => createAudioAndVideo(zv)}>
+                              {creatingId === zv.id ? 'Creating…' : 'Create'}
+                            </button>
+                            <button
+                              className="btn btn-danger"
+                              disabled={!zv.voice_over_url && !zv.rendered_video_url}
+                              onClick={() => deleteMedia(zv)}
+                            >
+                              {deletingId === zv.id ? 'Deleting…' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {zodiacVideos.length === 0 && (
+                    <tr><td colSpan="9" className="empty-state">No zodiac videos yet — created automatically when the channel was added.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
-      {selectedVideo && (
-        <VideoEditForm
-          video={selectedVideo}
-          onClose={() => { setSelectedVideo(null); load(); }}
+      {pickerOpen && (
+        <TopicPickerDialog
+          accountId={selectedAccountId}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(video) => { setPickerOpen(false); setSelectedTopic(video); }}
         />
       )}
     </div>
   );
 }
 
-function VideoSearchDialog({ accountId, onClose, onSelect }) {
+function AriesPreview({ zodiacVideos, thumbById }) {
+  const aries = zodiacVideos.find((zv) => zv.zodiac_sign === 'aries');
+  const thumb = aries && aries.thumbnail_preset_ref ? thumbById[aries.thumbnail_preset_ref] : null;
+
+  return (
+    <div className="card" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ flex: 1, minWidth: 280 }}>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Thumbnail (Aries example)</div>
+        {thumb && thumb.rendered_image ? (
+          <img
+            src={storageUrl(thumb.rendered_image)}
+            alt="Aries thumbnail"
+            style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 8 }}
+          />
+        ) : (
+          <div className="table-thumb-placeholder" style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 8 }} />
+        )}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 280 }}>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>Video (Aries example)</div>
+        {aries && aries.rendered_video_url ? (
+          <video
+            controls
+            src={aries.rendered_video_url}
+            poster={thumb && thumb.rendered_image ? storageUrl(thumb.rendered_image) : undefined}
+            style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 8, background: '#111' }}
+          />
+        ) : (
+          <div style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 8, background: '#111' }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TopicPickerDialog({ accountId, onClose, onSelect }) {
   const [q, setQ] = useState('');
-  const [videoType, setVideoType] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
 
-  const runSearch = useCallback(() => {
-    Api.videos.search(accountId, { q: q || undefined, video_type: videoType || undefined })
-      .then(setResults)
-      .catch((e) => setError(e.message));
-  }, [accountId, q, videoType]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(timer);
+  }, [q]);
 
-  useEffect(runSearch, [runSearch]);
+  useEffect(() => {
+    Api.videos.search(accountId, { q: debouncedQ || undefined })
+      .then((rows) => setResults(rows.filter((v) => v.topic)))
+      .catch((e) => setError(e.message));
+  }, [accountId, debouncedQ]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="page-title">Search Videos</div>
+        <div className="page-title">Select Topic</div>
         {error && <div className="error-banner">{error}</div>}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input placeholder="Search title/topic…" value={q} onChange={(e) => setQ(e.target.value)} style={{ flex: 1, padding: 8 }} />
-          <select value={videoType} onChange={(e) => setVideoType(e.target.value)}>
-            <option value="">Any type</option>
-            <option value="long">Long</option>
-            <option value="short">Short</option>
-          </select>
-          <button className="btn" onClick={runSearch}>Search</button>
+        <input
+          autoFocus
+          placeholder="Search topics…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          style={{ width: '100%', padding: 8, marginBottom: 12 }}
+        />
+        <div className="table-scroll">
+          <table className="table">
+            <tbody>
+              {results.map((v) => (
+                <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => onSelect(v)}>
+                  <td>{v.topic}</td>
+                  <td><StatusPill status={v.status} /></td>
+                </tr>
+              ))}
+              {results.length === 0 && <tr><td className="empty-state">No fed topics match.</td></tr>}
+            </tbody>
+          </table>
         </div>
-        <table className="table">
-          <tbody>
-            {results.map((v) => (
-              <tr key={v.id} style={{ cursor: 'pointer' }} onClick={() => onSelect(v)}>
-                <td>{v.title || v.topic || '(untitled)'}</td>
-                <td><span className={statusPillClass(v.status)}>{v.status}</span></td>
-              </tr>
-            ))}
-            {results.length === 0 && <tr><td className="empty-state">No matching videos (drafts/prepared/scheduled only).</td></tr>}
-          </tbody>
-        </table>
         <div style={{ marginTop: 12 }}>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function VideoEditForm({ video: initialVideo, onClose }) {
-  const [video, setVideo] = useState(initialVideo);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [generating, setGenerating] = useState(null);
-  const [scheduledAt, setScheduledAt] = useState(initialVideo.scheduled_at || '');
-
-  const update = (field) => (e) => setVideo((v) => ({ ...v, [field]: e.target.value }));
-
-  const save = () => {
-    setSaving(true);
-    setError(null);
-    Api.videos.update(video.id, {
-      title: video.title, description: video.description, tags: video.tags,
-      topic: video.topic, content: video.content, video_type: video.video_type,
-      voice_enabled: video.voice_enabled ? 1 : 0,
-    })
-      .then(setVideo)
-      .catch((e) => setError(e.message))
-      .finally(() => setSaving(false));
-  };
-
-  const generate = (field, apiCall, resultKey) => {
-    setGenerating(field);
-    setError(null);
-    apiCall(video.id)
-      .then((res) => setVideo((v) => ({ ...v, [field]: res[resultKey] })))
-      .catch((e) => setError(e.message))
-      .finally(() => setGenerating(null));
-  };
-
-  const schedule = () => {
-    if (!scheduledAt) return;
-    Api.videos.schedule(video.id, scheduledAt).then(setVideo).catch((e) => setError(e.message));
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="page-title">
-          Edit Video <span className={statusPillClass(video.status)}>{video.status}</span>
-        </div>
-        {error && <div className="error-banner">{error}</div>}
-
-        <div className="field">
-          <label>Topic</label>
-          <input value={video.topic || ''} onChange={update('topic')} />
-        </div>
-
-        <div className="field">
-          <label>Title {' '}
-            <button className="btn" disabled={generating === 'title'} onClick={() => generate('title', Api.content.generateTitle, 'title')}>
-              {generating === 'title' ? 'Generating…' : 'Generate (AI)'}
-            </button>
-          </label>
-          <input value={video.title || ''} onChange={update('title')} />
-        </div>
-
-        <div className="field">
-          <label>Description {' '}
-            <button className="btn" disabled={generating === 'description'} onClick={() => generate('description', Api.content.generateDescription, 'description')}>
-              {generating === 'description' ? 'Generating…' : 'Generate (AI)'}
-            </button>
-          </label>
-          <textarea rows="3" value={video.description || ''} onChange={update('description')} />
-        </div>
-
-        <div className="field">
-          <label>Tags {' '}
-            <button className="btn" disabled={generating === 'tags'} onClick={() => generate('tags', Api.content.generateTags, 'tags')}>
-              {generating === 'tags' ? 'Generating…' : 'Generate (AI)'}
-            </button>
-          </label>
-          <input value={video.tags || ''} onChange={update('tags')} />
-        </div>
-
-        <div className="field">
-          <label>Content / script {' '}
-            <button className="btn" disabled={generating === 'content'} onClick={() => generate('content', Api.content.generateContent, 'content')}>
-              {generating === 'content' ? 'Generating…' : 'Generate (AI)'}
-            </button>
-          </label>
-          <textarea rows="4" value={video.content || ''} onChange={update('content')} />
-        </div>
-
-        <div className="field" style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <input
-            type="checkbox"
-            id="voice_enabled"
-            checked={!!video.voice_enabled}
-            onChange={(e) => setVideo((v) => ({ ...v, voice_enabled: e.target.checked ? 1 : 0 }))}
-          />
-          <label htmlFor="voice_enabled" style={{ marginLeft: 8 }}>Voice-over enabled</label>
-          {video.voice_enabled ? (
-            <button
-              className="btn"
-              style={{ marginLeft: 12 }}
-              onClick={() => generate('voice_over_path', Api.content.generateVoiceOver, 'voice_over_path')}
-            >
-              Generate voice-over (Gemini)
-            </button>
-          ) : null}
-        </div>
-
-        <div className="field">
-          <label>Video type</label>
-          <select value={video.video_type || ''} onChange={update('video_type')}>
-            <option value="">Select…</option>
-            <option value="long">Long</option>
-            <option value="short">Short</option>
-          </select>
-        </div>
-
-        <div className="field">
-          <label>Thumbnail</label>
-          {video.thumbnail_ref ? (
-            <span>Thumbnail attached (ref #{video.thumbnail_ref})</span>
-          ) : (
-            <span>No thumbnail yet — create one on the Thumbnails page for this video.</span>
-          )}
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button className="btn btn-primary" disabled={saving} onClick={save}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button className="btn" onClick={onClose}>Close</button>
-        </div>
-
-        {video.status === 'prepared' || video.status === 'scheduled' ? (
-          <div className="field" style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
-            <label>Posting date &amp; time</label>
-            <input type="datetime-local" value={(scheduledAt || '').replace(' ', 'T').slice(0, 16)}
-                   onChange={(e) => setScheduledAt(e.target.value.replace('T', ' ') + ':00')} />
-            <button className="btn" style={{ marginTop: 8 }} onClick={schedule}>Set schedule</button>
-          </div>
-        ) : null}
       </div>
     </div>
   );

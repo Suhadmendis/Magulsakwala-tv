@@ -60,11 +60,15 @@ class ThumbnailRenderService
 
         $filename = 'rendered_' . uniqid('', true) . '.png';
         $dir = (new StorageService())->thumbnailsDir($accountId);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            imagedestroy($canvas);
+            throw new RuntimeException("Failed to create thumbnail folder: $dir");
         }
         $destination = $dir . '/' . $filename;
-        imagepng($canvas, $destination);
+        if (!imagepng($canvas, $destination)) {
+            imagedestroy($canvas);
+            throw new RuntimeException("Failed to write rendered thumbnail to $destination");
+        }
         imagedestroy($canvas);
 
         return $destination;

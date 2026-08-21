@@ -93,4 +93,28 @@ class OpenAIService
             "Write a video script for this topic: $topic"
         );
     }
+
+    public function generateHook(string $topic): string
+    {
+        return $this->generateText(
+            'You write short, scroll-stopping opening hooks for short-form video content. Respond with only the hook, no quotes.',
+            "Write a hook for a video about: $topic"
+        );
+    }
+
+    public function generateFeederContent(string $topic): string
+    {
+        return $this->generateText(
+            'You write short-form video content/scripts (the body, between the hook and the call-to-action). Respond with only the body text.',
+            "Write short-form video content for this topic: $topic"
+        );
+    }
+
+    public function generateCta(string $topic): string
+    {
+        return $this->generateText(
+            'You write short, punchy calls-to-action for short-form video content. Respond with only the CTA, no quotes.',
+            "Write a call-to-action for a video about: $topic"
+        );
+    }
 }

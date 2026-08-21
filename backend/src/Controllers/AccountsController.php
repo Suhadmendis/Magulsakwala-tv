@@ -51,6 +51,16 @@ class AccountsController
         // Provision the account's dedicated storage folder.
         (new StorageService())->provisionAccountFolder($accountId);
 
+        // Auto-seed the 12 zodiac sign video slots for this channel.
+        $placeholders = implode(', ', array_fill(0, count(ZodiacVideosController::SIGNS), '(?, ?)'));
+        $seedSql = "INSERT INTO zodiac_videos (account_id, zodiac_sign) VALUES $placeholders";
+        $seedArgs = [];
+        foreach (ZodiacVideosController::SIGNS as $sign) {
+            $seedArgs[] = $accountId;
+            $seedArgs[] = $sign;
+        }
+        $db->prepare($seedSql)->execute($seedArgs);
+
         $stmt = $db->prepare('SELECT * FROM accounts WHERE id = ?');
         $stmt->execute([$accountId]);
         Response::json($stmt->fetch(), 201);
@@ -111,8 +121,41 @@ class AccountsController
     public static function destroy(array $params): void
     {
         $db = Database::connection();
+        $stmt = $db->prepare('SELECT id FROM accounts WHERE id = ?');
+        $stmt->execute([$params['id']]);
+        if (!$stmt->fetch()) {
+            Response::error('Account not found', 404);
+            return;
+        }
+
         $stmt = $db->prepare('DELETE FROM accounts WHERE id = ?');
         $stmt->execute([$params['id']]);
+
+        // Row deletion cascades video_operations/thumbnails in the DB; the
+        // on-disk folder is this app's responsibility to clean up.
+        (new StorageService())->deleteAccountFolder((int) $params['id']);
+
         Response::json(['deleted' => true]);
+    }
+
+    /** Shared account lookup used by controllers that need account credentials for an external call. */
+    public static function requireAccount($accountId): ?array
+    {
+        if (!$accountId) {
+            Response::error('account_id is required', 422);
+            return null;
+        }
+
+        $db = Database::connection();
+        $stmt = $db->prepare('SELECT * FROM accounts WHERE id = ?');
+        $stmt->execute([$accountId]);
+        $account = $stmt->fetch();
+
+        if (!$account) {
+            Response::error('Account not found', 404);
+            return null;
+        }
+
+        return $account;
     }
 }

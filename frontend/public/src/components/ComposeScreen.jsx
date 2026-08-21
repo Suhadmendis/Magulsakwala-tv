@@ -1,9 +1,24 @@
+function timeUntil(target) {
+  if (!target) return null;
+  const diffMs = new Date(target.replace(' ', 'T')).getTime() - Date.now();
+  if (Number.isNaN(diffMs)) return null;
+  const past = diffMs < 0;
+  const abs = Math.abs(diffMs);
+  const hours = Math.floor(abs / 3600000);
+  const minutes = Math.floor((abs % 3600000) / 60000);
+  const parts = [];
+  if (hours) parts.push(`${hours}h`);
+  parts.push(`${minutes}m`);
+  return (past ? 'overdue by ' : 'in ') + parts.join(' ');
+}
+
 function ComposeScreen() {
   const { selectedAccountId } = useAccountContext();
   const [next, setNext] = useState(undefined);
   const [error, setError] = useState(null);
   const [posting, setPosting] = useState(false);
   const [postResult, setPostResult] = useState(null);
+  const toast = useToast();
 
   // Upload form state.
   const [topic, setTopic] = useState('');
@@ -23,7 +38,7 @@ function ComposeScreen() {
     setError(null);
     setPostResult(null);
     Api.compose.postNext(selectedAccountId)
-      .then((video) => { setPostResult(video); loadNext(); })
+      .then((video) => { setPostResult(video); toast.show('Video published'); loadNext(); })
       .catch((e) => setError(e.message))
       .finally(() => setPosting(false));
   };
@@ -37,7 +52,7 @@ function ComposeScreen() {
     form.append('topic', topic);
     form.append('video', file);
     Api.videos.upload(form)
-      .then((video) => { setUploadResult(video); setTopic(''); setFile(null); })
+      .then((video) => { setUploadResult(video); setTopic(''); setFile(null); toast.show('Draft video created'); })
       .catch((e) => setError(e.message))
       .finally(() => setUploading(false));
   };
@@ -70,19 +85,25 @@ function ComposeScreen() {
         {next && next.video && (
           <div className="compose-preview">
             {next.thumbnail && next.thumbnail.rendered_image && (
-              <img src={storageUrl(next.thumbnail.rendered_image)} alt="thumbnail preview" />
+              <img loading="lazy" width="320" height="180" src={storageUrl(next.thumbnail.rendered_image)} alt="thumbnail preview" />
             )}
             <div>
               <h4 style={{ marginTop: 0 }}>{next.video.title}</h4>
               <p>{next.video.description}</p>
-              <p><strong>Scheduled for:</strong> {next.video.scheduled_at}</p>
+              <p>
+                <StatusPill status={next.video.status} />
+                {' — '}
+                <span className="mono">{next.video.scheduled_at}</span>
+                {' '}
+                <span className="countdown">({timeUntil(next.video.scheduled_at)})</span>
+              </p>
               <button className="btn btn-primary" disabled={posting} onClick={post}>
                 {posting ? 'Posting…' : 'Post now'}
               </button>
             </div>
           </div>
         )}
-        {postResult && <p>Video #{postResult.id} is now <strong>{postResult.status}</strong>.</p>}
+        {postResult && <p>Video #{postResult.id} is now <StatusPill status={postResult.status} />.</p>}
       </div>
     </div>
   );

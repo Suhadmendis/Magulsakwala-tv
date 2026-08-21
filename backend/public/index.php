@@ -14,12 +14,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $router = new Router();
 
 AccountsController::routes($router);
+YouTubeOAuthController::routes($router);
 VideosController::routes($router);
+ZodiacVideosController::routes($router);
+ContentFeederController::routes($router);
 ComposeController::routes($router);
 FindingsController::routes($router);
 CommentsController::routes($router);
 ContentController::routes($router);
 ThumbnailsController::routes($router);
+ThumbnailPresetsController::routes($router);
+AssetsController::routes($router);
 AnalyticsController::routes($router);
+SystemController::routes($router);
 
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

@@ -12,7 +12,7 @@ class CommentsController
     /** Live-fetches un-replied comments from YouTube, oldest first. No local table. */
     public static function index(array $params): void
     {
-        $account = self::requireAccount(Request::query('account_id'));
+        $account = AccountsController::requireAccount(Request::query('account_id'));
         if (!$account) {
             return;
         }
@@ -49,7 +49,7 @@ class CommentsController
     public static function reply(array $params): void
     {
         $body = Request::jsonBody();
-        $account = self::requireAccount($body['account_id'] ?? null);
+        $account = AccountsController::requireAccount($body['account_id'] ?? null);
         if (!$account) {
             return;
         }
@@ -69,25 +69,5 @@ class CommentsController
         } catch (Throwable $e) {
             Response::error($e->getMessage(), 502);
         }
-    }
-
-    private static function requireAccount($accountId): ?array
-    {
-        if (!$accountId) {
-            Response::error('account_id is required', 422);
-            return null;
-        }
-
-        $db = Database::connection();
-        $stmt = $db->prepare('SELECT * FROM accounts WHERE id = ?');
-        $stmt->execute([$accountId]);
-        $account = $stmt->fetch();
-
-        if (!$account) {
-            Response::error('Account not found', 404);
-            return null;
-        }
-
-        return $account;
     }
 }

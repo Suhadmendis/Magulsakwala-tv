@@ -44,19 +44,28 @@ class Router
         $path = parse_url($uri, PHP_URL_PATH);
         $method = strtoupper($method);
 
+        $allowedMethods = [];
         foreach ($this->routes as $route) {
-            if ($route['method'] !== $method) {
+            if (!preg_match($route['regex'], $path, $matches)) {
                 continue;
             }
-            if (preg_match($route['regex'], $path, $matches)) {
-                $params = array_filter(
-                    $matches,
-                    fn($key) => is_string($key),
-                    ARRAY_FILTER_USE_KEY
-                );
-                call_user_func($route['handler'], $params);
-                return;
+            if ($route['method'] !== $method) {
+                $allowedMethods[] = $route['method'];
+                continue;
             }
+            $params = array_filter(
+                $matches,
+                fn($key) => is_string($key),
+                ARRAY_FILTER_USE_KEY
+            );
+            call_user_func($route['handler'], $params);
+            return;
+        }
+
+        if (!empty($allowedMethods)) {
+            header('Allow: ' . implode(', ', array_unique($allowedMethods)));
+            Response::error('Method not allowed', 405);
+            return;
         }
 
         Response::error('Not found', 404);

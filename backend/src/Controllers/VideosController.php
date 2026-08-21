@@ -13,6 +13,7 @@ class VideosController
         $router->get('/api/videos/{id}', [self::class, 'show']);
         $router->put('/api/videos/{id}', [self::class, 'update']);
         $router->put('/api/videos/{id}/schedule', [self::class, 'schedule']);
+        $router->post('/api/videos/{id}/render', [self::class, 'render']);
         $router->delete('/api/videos/{id}', [self::class, 'destroy']);
     }
 
@@ -86,7 +87,12 @@ class VideosController
         $videoPath = null;
 
         if (!empty($_FILES['video'])) {
-            $videoPath = (new StorageService())->saveUploadedFile((int) $accountId, 'videos', $_FILES['video']);
+            try {
+                $videoPath = (new StorageService())->saveUploadedFile((int) $accountId, 'videos', $_FILES['video']);
+            } catch (RuntimeException $e) {
+                Response::error($e->getMessage(), 502);
+                return;
+            }
         }
 
         $stmt = $db->prepare(
@@ -128,10 +134,18 @@ class VideosController
             }
         }
 
-        // Auto-advance draft -> prepared once every required field is filled.
-        if ($video['status'] === 'draft' && self::isCompleteForPrepared($video)) {
+        // Keep status in sync with field completeness: advance draft -> prepared once
+        // every required field is filled, and fall back prepared/scheduled -> draft if
+        // an edit blanks out a previously-required field.
+        $isComplete = self::isCompleteForPrepared($video);
+        if ($video['status'] === 'draft' && $isComplete) {
             $updates[] = 'status = :status';
             $values['status'] = 'prepared';
+        } elseif (in_array($video['status'], ['prepared', 'scheduled'], true) && !$isComplete) {
+            $updates[] = 'status = :status';
+            $values['status'] = 'draft';
+            $updates[] = 'scheduled_at = :scheduled_at';
+            $values['scheduled_at'] = null;
         }
 
         if (!empty($updates)) {
@@ -176,6 +190,31 @@ class VideosController
 
     public static function destroy(array $params): void
     {
+        $video = self::find($params['id']);
+        if (!$video) {
+            Response::error('Video not found', 404);
+            return;
+        }
+
+        $storage = new StorageService();
+        $storage->deleteFile($video['video_path']);
+
+        $supabaseStorage = new SupabaseStorageService();
+        $supabaseStorage->deleteObject('media', $video['voice_over_path']);
+        $supabaseStorage->deleteObject('media', $video['rendered_video_path']);
+
+        if (!empty($video['thumbnail_ref'])) {
+            $db = Database::connection();
+            $stmt = $db->prepare('SELECT * FROM thumbnails WHERE id = ?');
+            $stmt->execute([$video['thumbnail_ref']]);
+            $thumbnail = $stmt->fetch();
+            if ($thumbnail) {
+                foreach (['background_image', 'image_1', 'image_2', 'image_3', 'image_4', 'image_5', 'rendered_image'] as $field) {
+                    $storage->deleteFile($thumbnail[$field]);
+                }
+            }
+        }
+
         $db = Database::connection();
         $stmt = $db->prepare('DELETE FROM video_operations WHERE id = ?');
         $stmt->execute([$params['id']]);
@@ -192,12 +231,89 @@ class VideosController
         return true;
     }
 
+    public static function render(array $params): void
+    {
+        $video = self::find($params['id']);
+        if (!$video) {
+            Response::error('Video not found', 404);
+            return;
+        }
+
+        if (empty($video['thumbnail_ref'])) {
+            Response::error('Video needs a thumbnail before it can be rendered', 422);
+            return;
+        }
+        if (empty($video['voice_over_path'])) {
+            Response::error('Video needs a voice-over before it can be rendered', 422);
+            return;
+        }
+
+        $db = Database::connection();
+        $stmt = $db->prepare('SELECT * FROM thumbnails WHERE id = ?');
+        $stmt->execute([$video['thumbnail_ref']]);
+        $thumbnail = $stmt->fetch();
+        if (!$thumbnail || empty($thumbnail['rendered_image'])) {
+            Response::error('Thumbnail has no rendered image yet', 422);
+            return;
+        }
+
+        $storage = new SupabaseStorageService();
+        $audioUrl = $storage->signedUrl('media', $video['voice_over_path']);
+        if (!$audioUrl) {
+            Response::error('Could not access the stored voice-over audio', 502);
+            return;
+        }
+
+        $tmpAudioPath = sys_get_temp_dir() . '/audio_' . uniqid('', true) . '.wav';
+        try {
+            $audioBytes = file_get_contents($audioUrl);
+            if ($audioBytes === false) {
+                throw new RuntimeException('Failed to download voice-over audio');
+            }
+            file_put_contents($tmpAudioPath, $audioBytes);
+
+            $renderedPath = (new VideoRenderService())->render(
+                $thumbnail['rendered_image'],
+                $tmpAudioPath,
+                $video['video_type'] ?? 'long'
+            );
+
+            $objectPath = "accounts/{$video['account_id']}/videos/rendered_{$video['id']}_" . time() . '.mp4';
+            $storage->uploadBytes('media', $objectPath, file_get_contents($renderedPath), 'video/mp4');
+
+            $stmt = $db->prepare('UPDATE video_operations SET rendered_video_path = ? WHERE id = ?');
+            $stmt->execute([$objectPath, $video['id']]);
+
+            Response::json([
+                'rendered_video_path' => $objectPath,
+                'rendered_video_url' => $storage->signedUrl('media', $objectPath),
+            ]);
+        } catch (Throwable $e) {
+            Response::error($e->getMessage(), 502);
+        } finally {
+            if (is_file($tmpAudioPath)) {
+                unlink($tmpAudioPath);
+            }
+            if (isset($renderedPath) && is_file($renderedPath)) {
+                unlink($renderedPath);
+            }
+        }
+    }
+
     public static function find($id): ?array
     {
         $db = Database::connection();
         $stmt = $db->prepare('SELECT * FROM video_operations WHERE id = ?');
         $stmt->execute([$id]);
         $video = $stmt->fetch();
-        return $video ?: null;
+        if (!$video) {
+            return null;
+        }
+
+        $storage = new SupabaseStorageService();
+        $video['voice_over_url'] = $storage->signedUrl('media', $video['voice_over_path']);
+        $video['rendered_video_url'] = $storage->signedUrl('media', $video['rendered_video_path']);
+
+        return $video;
     }
 }

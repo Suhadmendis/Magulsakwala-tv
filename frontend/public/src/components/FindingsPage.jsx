@@ -4,6 +4,7 @@ function FindingsPage() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [posting, setPosting] = useState(false);
+  const toast = useToast();
 
   const post = () => {
     setError(null);
@@ -22,7 +23,7 @@ function FindingsPage() {
 
     setPosting(true);
     Api.findings.import(selectedAccountId, parsed.elements)
-      .then((res) => setResult(res))
+      .then((res) => { setResult(res); toast.show(`Created ${res.count} draft video(s)`); })
       .catch((e) => setError(e.message))
       .finally(() => setPosting(false));
   };
